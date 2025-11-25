@@ -1,0 +1,19 @@
+employee_id,name,department,salary,years_experience,office
+1,Alice Zhang,Data Science,120000,4.5,NY
+2,Bob Smith,Engineering,95000,3,SF
+3,Carol Lee,Data Science,105000,5,Remote
+4,David Kim,Product,88000,4,NY
+5,Eva Müller,Marketing,72000,2.5,Berlin
+6,Frank Johnson,Data Science,98000,2,SF
+7,Grace Park,Engineering,110000,6,NY
+8,Henry Brown,Finance,78000,3.5,London
+9,Irene García,HR,65000,2,Remote
+10,Jack Wilson,Product,102000,5.5,SF
+11,Karen Davis,Marketing,69000,1.5,London
+12,Leo Rossi,Data Science,89000,1,Berlin
+13,Maria Lopez,Engineering,97000,4,Remote
+14,Nathan Clark,Finance,115000,7,NY
+15,Olivia Perez,Data Science,132000,8,SF
+16,Paul Adams,Engineering,83000,2.5,Berlin
+17,Quinn Taylor,Product,91000,3,London
+18,Ryan Chen,Data Science,75000,1.2,Remote
