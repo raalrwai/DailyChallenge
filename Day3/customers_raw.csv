@@ -1,0 +1,13 @@
+customer_id,name,age,country,signup_date,email
+1,Alice Johnson,29,USA,1/15/2024,alice@example.com
+2,Bob Smith,35,United States,15/02/2024,bob.smith@example.com
+3,Carlos Diaz,,us,3/10/2024,carlos@example.com
+4,Diana Müller,42,Germany,3/18/2024,diana@example.com
+5,Emma Rossi,31,usa,March 5 2024,emma@example.com
+6,Faisal Khan,27,Canada,2/1/2024,faisal@example.com
+7,Grace Lee,,united states,1/28/2024,grace.lee@example.com
+8,Henry Brown,38,UK,2/20/2024,henry@example.com
+9,Irene Garcia,24,mexico,3/2/2024,irene@example.com
+10,John Doe,50,US,3/5/2024,john@example.com
+10,John Doe,50,US,3/22/2024,john.doe+new@example.com
+3,Carlos Diaz,,us,3/10/2024,carlos@example.com

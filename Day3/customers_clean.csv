@@ -1,0 +1,11 @@
+customer_id,name,age,country,signup_date,email,signup_year
+5,Emma Rossi,31.0,usa,2024-03-05,emma@example.com,2024.0
+10,John Doe,50.0,usa,,john@example.com,
+9,Irene Garcia,24.0,mexico,,irene@example.com,
+4,Diana Müller,42.0,germany,,diana@example.com,
+3,Carlos Diaz,33.0,usa,,carlos@example.com,
+8,Henry Brown,38.0,uk,,henry@example.com,
+6,Faisal Khan,27.0,canada,,faisal@example.com,
+2,Bob Smith,35.0,usa,,bob.smith@example.com,
+7,Grace Lee,33.0,usa,,grace.lee@example.com,
+1,Alice Johnson,29.0,usa,,alice@example.com,
