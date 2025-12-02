@@ -1,0 +1,21 @@
+PassengerId,Survived,Pclass,Name,Sex,Age,SibSp,Parch,Fare,Embarked
+1,0,3,"Smith, Mr. John",male,22,1,0,7.25,S
+2,1,1,"Johnson, Mrs. Emily",female,38,1,0,71.28,C
+3,1,3,"Brown, Miss. Anna",female,26,0,0,7.92,S
+4,1,1,"Davis, Mrs. Laura",female,35,1,1,53.1,S
+5,0,3,"Miller, Mr. Thomas",male,35,0,0,8.05,S
+6,0,3,"Wilson, Master. Peter",male,2,1,1,21.08,S
+7,0,1,"Moore, Mr. Charles",male,54,0,0,51.86,S
+8,0,3,"Taylor, Mr. Henry",male,20,0,0,8.46,S
+9,1,3,"Anderson, Miss. Maria",female,17,0,0,7.74,Q
+10,1,2,"Thomas, Mr. George",male,30,0,0,13,S
+11,0,2,"Jackson, Mrs. Helen",female,45,1,0,26,S
+12,0,3,"White, Mr. Edward",male,28,0,0,7.23,C
+13,0,3,"Harris, Mr. Arthur",male,19,0,0,8.05,S
+14,1,1,"Martin, Miss. Sophia",female,32,0,0,86.5,S
+15,0,3,"Thompson, Mr. Robert",male,,0,0,7.75,Q
+16,0,3,"Garcia, Miss. Isabel",female,21,0,0,7.8,S
+17,0,2,"Martinez, Mr. Luis",male,33,0,0,13.5,S
+18,1,2,"Robinson, Miss. Alice",female,27,0,0,12.35,C
+19,0,3,"Clark, Mr. Frank",male,40,1,0,15.5,S
+20,1,1,"Rodriguez, Mrs. Elena",female,,1,1,120,
