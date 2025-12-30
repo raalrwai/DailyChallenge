@@ -1,4 +1,4 @@
-from agents import Agent, FunctionTool, Runner
+from AgenticAI import Agent, FunctionTool, Runner
 
 @function_tool
 def getAddress():
@@ -9,7 +9,7 @@ def getSquareFeet():
 
 house = Agent{
     name =  "Address Agent",
-    instructions = "You're a get Address Agent. Your main responsibility is " \
+    instructions = "You're a get Address Agent. Your main responsibility is ", 
     "to allow a user to get their address"
     tools = [getAddress, getSquareFeet]
 }
