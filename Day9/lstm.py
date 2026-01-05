@@ -130,3 +130,4 @@ plt.plot(y_pred, label='Predicted')
 plt.legend()
 plt.title("Stacked LSTM Predictions")
 plt.show()
+
