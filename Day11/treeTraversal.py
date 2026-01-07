@@ -175,3 +175,43 @@ if __name__ == "__main__":
     print("Max Level Sum:", max_level_sum(root))
     print("Total Nodes:", count_nodes(root))
     print("Is Balanced:", is_balanced(root))
+
+
+class Solution:
+    def maxProduct(self, root):
+        MOD = 10**9 + 7
+        subtree_sums = []
+
+        def dfs(node):
+            if not node:
+                return 0
+            left_sum = dfs(node.left)
+            right_sum = dfs(node.right)
+            curr_sum = node.val + left_sum + right_sum
+            subtree_sums.append(curr_sum)
+            return curr_sum
+
+        total_sum = dfs(root)
+        max_product = 0
+        for s in subtree_sums:
+            product = s * (total_sum - s)
+            max_product = max(max_product, product)
+
+        return max_product % MOD
+
+# -----------------------------
+# New input tree
+# Tree:
+#       10
+#      /  \
+#     5    3
+#    / \    \
+#   2   1    6
+
+root = TreeNode(10)
+root.left = TreeNode(5, TreeNode(2), TreeNode(1))
+root.right = TreeNode(3, None, TreeNode(6))
+
+solution = Solution()
+result = solution.maxProduct(root)
+print("Maximum Product:", result)
