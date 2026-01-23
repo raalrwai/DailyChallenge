@@ -1,149 +1,255 @@
 """
 Customer-Facing RAG Chatbot with Sentiment Classification
-- RAG pipeline using Pinecone + OpenAI embeddings
-- Two sentiment models:
-    1. TF-IDF + Logistic Regression (CPU-friendly)
-    2. DistilBERT (GPU, optional)
-- Dynamic prompt restructuring based on sentiment
+
+Capabilities:
+- Retrieval-Augmented Generation using Pinecone + OpenAI embeddings
+- Dual sentiment classification strategies:
+    1. TF-IDF + Logistic Regression (CPU-friendly, deterministic)
+    2. DistilBERT sentiment classifier (GPU-accelerated, optional)
+- Dynamic prompt restructuring based on detected sentiment
+
+Intended usage:
+- Lightweight customer support assistant
+- Tone-aware response generation
+- Safe default behavior when ML components are unavailable
 """
 
 import os
-from dotenv import load_dotenv
 import re
-from typing import List
+import logging
+from typing import List, Tuple, Optional
+
 import numpy as np
+from dotenv import load_dotenv
 
-# ML packages
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.linear_model import LogisticRegression
-from sklearn.pipeline import Pipeline
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report
+# -----------------------------
+# Logging
+# -----------------------------
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(message)s"
+)
+logger = logging.getLogger(__name__)
 
-# Optional transformer model
-try:
-    from transformers import AutoTokenizer, AutoModelForSequenceClassification
-    import torch
-    USE_TRANSFORMER = True
-except ImportError:
-    USE_TRANSFORMER = False
-
-# OpenAI & Pinecone
-from openai import OpenAI
-from pinecone import Pinecone
-
+# -----------------------------
+# Environment / Config
+# -----------------------------
 load_dotenv()
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME")
 
+EMBEDDING_MODEL = "text-embedding-3-small"
+CHAT_MODEL = "gpt-4o-mini"
+
+DEFAULT_TOP_K = 4
+DEFAULT_CHUNK_SIZE = 800
+DEFAULT_CHUNK_OVERLAP = 100
+
+# Sentiment label conventions
+NEGATIVE = 0
+NEUTRAL = 1
+POSITIVE = 2
+
+# -----------------------------
+# ML packages (CPU)
+# -----------------------------
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import Pipeline
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report
+
+# -----------------------------
+# Optional transformer model
+# -----------------------------
+try:
+    import torch
+    from transformers import AutoTokenizer, AutoModelForSequenceClassification
+
+    USE_TRANSFORMER = torch.cuda.is_available()
+except ImportError:
+    USE_TRANSFORMER = False
+
+# -----------------------------
+# External services
+# -----------------------------
+from openai import OpenAI
+from pinecone import Pinecone
+
 client = OpenAI(api_key=OPENAI_API_KEY)
 pc = Pinecone(api_key=PINECONE_API_KEY)
 index = pc.Index(PINECONE_INDEX_NAME)
 
 # -----------------------------
-# 1a. Preprocessing
+# 1. Text preprocessing
 # -----------------------------
 def preprocess_text(text: str) -> str:
-    """Basic text cleaning for sentiment classification."""
+    """
+    Normalize user input for sentiment classification.
+    This should be lightweight and deterministic.
+    """
     text = text.lower()
-    text = re.sub(r"http\S+", "", text)  # remove urls
-    text = re.sub(r"[^a-z0-9\s]", "", text)  # remove punctuation
+    text = re.sub(r"http\S+", "", text)
+    text = re.sub(r"[^a-z0-9\s]", "", text)
     text = re.sub(r"\s+", " ", text).strip()
     return text
 
 # -----------------------------
-# 1b. TF-IDF + Logistic Regression
+# 2. TF-IDF sentiment model
 # -----------------------------
-def train_simple_sentiment(texts: List[str], labels: List[int]):
+def train_simple_sentiment(
+    texts: List[str],
+    labels: List[int]
+) -> Pipeline:
     """
-    Trains a simple TF-IDF + Logistic Regression pipeline.
-    labels: 0 = negative, 1 = neutral, 2 = positive
+    Train a TF-IDF + Logistic Regression classifier.
+
+    Labels:
+        0 = negative
+        1 = neutral
+        2 = positive
     """
-    X_train, X_test, y_train, y_test = train_test_split(texts, labels, test_size=0.2, random_state=42)
-    pipeline = Pipeline([
-        ('tfidf', TfidfVectorizer(max_features=5000)),
-        ('clf', LogisticRegression(max_iter=500))
-    ])
+    logger.info("Training TF-IDF sentiment model")
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        texts, labels, test_size=0.2, random_state=42, stratify=labels
+    )
+
+    pipeline = Pipeline(
+        steps=[
+            ("tfidf", TfidfVectorizer(max_features=5000)),
+            ("clf", LogisticRegression(max_iter=500, n_jobs=1))
+        ]
+    )
+
     pipeline.fit(X_train, y_train)
+
     preds = pipeline.predict(X_test)
-    print("[TFIDF MODEL] Classification report:")
-    print(classification_report(y_test, preds))
+    logger.info("TF-IDF sentiment classification report:\n%s",
+                classification_report(y_test, preds))
+
     return pipeline
 
 # -----------------------------
-# 1c. Transformer-based classifier (optional GPU)
+# 3. Transformer-based sentiment (optional)
 # -----------------------------
 if USE_TRANSFORMER:
-    tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased-finetuned-sst-2-english")
-    transformer_model = AutoModelForSequenceClassification.from_pretrained("distilbert-base-uncased-finetuned-sst-2-english")
+    logger.info("Loading DistilBERT sentiment model (GPU enabled)")
+    tokenizer = AutoTokenizer.from_pretrained(
+        "distilbert-base-uncased-finetuned-sst-2-english"
+    )
+    transformer_model = AutoModelForSequenceClassification.from_pretrained(
+        "distilbert-base-uncased-finetuned-sst-2-english"
+    ).cuda()
 
-def predict_sentiment_transformer(text: str):
+
+def predict_sentiment_transformer(text: str) -> Tuple[int, float]:
     """
-    Predict sentiment with DistilBERT.
-    Returns 0 = negative, 1 = positive
+    Predict sentiment using DistilBERT.
+    Returns:
+        label: 0 (negative) or 1 (positive)
+        confidence: softmax probability
     """
-    inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
+    inputs = tokenizer(
+        text, return_tensors="pt", truncation=True, padding=True
+    ).to("cuda")
+
     with torch.no_grad():
         outputs = transformer_model(**inputs)
-        probs = torch.nn.functional.softmax(outputs.logits, dim=-1)
-        pred = torch.argmax(probs, dim=-1).item()
-        return pred, probs[0][pred].item()
+        probs = torch.softmax(outputs.logits, dim=-1)
+        label = int(torch.argmax(probs, dim=-1).item())
+        confidence = float(probs[0, label].item())
+
+    return label, confidence
 
 # -----------------------------
-# 2. RAG pipeline helpers (from previous example)
+# 4. RAG helpers
 # -----------------------------
-def chunk_text(text, chunk_size=800, overlap=100):
-    """Chunk text with overlap"""
+def chunk_text(
+    text: str,
+    chunk_size: int = DEFAULT_CHUNK_SIZE,
+    overlap: int = DEFAULT_CHUNK_OVERLAP
+):
+    """Split long documents into overlapping chunks."""
     chunks = []
     start = 0
     chunk_id = 0
+
     while start < len(text):
         end = start + chunk_size
-        chunks.append({
-            "chunk_id": chunk_id,
-            "text": text[start:end]
-        })
-        start = end - overlap
+        chunks.append(
+            {"chunk_id": chunk_id, "text": text[start:end]}
+        )
+        start = max(end - overlap, 0)
         chunk_id += 1
+
     return chunks
 
-def embed_texts(texts):
-    """Convert list of texts to embedding vectors using OpenAI"""
-    resp = client.embeddings.create(model="text-embedding-3-small", input=texts)
-    return [item.embedding for item in resp.data]
 
-def embed_query(query):
-    resp = client.embeddings.create(model="text-embedding-3-small", input=query)
-    return resp.data[0].embedding
+def embed_texts(texts: List[str]) -> List[List[float]]:
+    """Generate embeddings for documents."""
+    response = client.embeddings.create(
+        model=EMBEDDING_MODEL,
+        input=texts
+    )
+    return [item.embedding for item in response.data]
 
-def retrieve_similar_chunks(query_embedding, top_k=4):
-    results = index.query(vector=query_embedding, top_k=top_k, include_metadata=True)
-    return results.matches
+
+def embed_query(query: str) -> List[float]:
+    response = client.embeddings.create(
+        model=EMBEDDING_MODEL,
+        input=query
+    )
+    return response.data[0].embedding
+
+
+def retrieve_similar_chunks(
+    query_embedding: List[float],
+    top_k: int = DEFAULT_TOP_K
+):
+    """Retrieve semantically similar chunks from Pinecone."""
+    results = index.query(
+        vector=query_embedding,
+        top_k=top_k,
+        include_metadata=True
+    )
+
+    matches = []
+    for match in results.matches:
+        if match.metadata and "text" in match.metadata:
+            matches.append(match)
+
+    return matches
 
 # -----------------------------
-# 3. Dynamic prompt based on sentiment
+# 5. Prompt construction
 # -----------------------------
-def build_prompt(user_query: str, retrieved_chunks, sentiment_label: int):
+def build_prompt(
+    user_query: str,
+    retrieved_chunks,
+    sentiment_label: int
+) -> str:
     """
-    Build LLM prompt. Adjust tone based on sentiment:
-    - 0 = negative → empathetic
-    - 1 = neutral → standard
-    - 2 = positive → upbeat
+    Build an LLM prompt with sentiment-aware tone control.
     """
-    context = "\n\n".join([chunk.metadata["text"] for chunk in retrieved_chunks])
+    context = "\n\n".join(
+        chunk.metadata["text"] for chunk in retrieved_chunks
+    )
 
-    if sentiment_label == 0:
-        tone_instruction = "The user seems frustrated or upset. Respond empathetically and clearly."
-    elif sentiment_label == 1:
-        tone_instruction = "Respond politely and factually."
+    if sentiment_label == NEGATIVE:
+        tone = "The user seems frustrated. Respond empathetically and calmly."
+    elif sentiment_label == POSITIVE:
+        tone = "The user seems positive. Respond helpfully and enthusiastically."
     else:
-        tone_instruction = "The user seems happy. Respond positively and cheerfully."
+        tone = "Respond professionally and clearly."
 
-    prompt = f"""
-{tone_instruction}
-Use the context below to answer the question. Do not make up facts.
+    return f"""
+{tone}
+
+Use the context below to answer the question.
+If the answer is not contained in the context, say you do not know.
 
 Context:
 {context}
@@ -152,58 +258,76 @@ Question:
 {user_query}
 
 Answer:
-"""
-    return prompt
+""".strip()
 
-def generate_answer(prompt):
-    """Call OpenAI GPT to generate response"""
-    resp = client.chat.completions.create(
-        model="gpt-4o-mini",
+# -----------------------------
+# 6. LLM invocation
+# -----------------------------
+def generate_answer(prompt: str) -> str:
+    response = client.chat.completions.create(
+        model=CHAT_MODEL,
         messages=[{"role": "user", "content": prompt}],
         temperature=0.1
     )
-    return resp.choices[0].message.content
+    return response.choices[0].message.content
 
 # -----------------------------
-# 4. Full query pipeline
+# 7. End-to-end pipeline
 # -----------------------------
-def answer_user_query(user_query: str, sentiment_model_pipeline=None):
-    """End-to-end RAG + sentiment response"""
-    preprocessed = preprocess_text(user_query)
-    
-    # 1. Predict sentiment (TF-IDF if available, else DistilBERT if GPU)
+def answer_user_query(
+    user_query: str,
+    sentiment_model_pipeline: Optional[Pipeline] = None
+) -> Tuple[str, int]:
+    """
+    Full RAG + sentiment-aware response generation.
+    """
+    cleaned = preprocess_text(user_query)
+
+    # Sentiment selection logic
     if sentiment_model_pipeline:
-        sentiment_label = sentiment_model_pipeline.predict([preprocessed])[0]
+        sentiment = int(
+            sentiment_model_pipeline.predict([cleaned])[0]
+        )
     elif USE_TRANSFORMER:
-        sentiment_label, _ = predict_sentiment_transformer(preprocessed)
+        raw_label, _ = predict_sentiment_transformer(cleaned)
+        sentiment = POSITIVE if raw_label == 1 else NEGATIVE
     else:
-        sentiment_label = 1  # default neutral
+        sentiment = NEUTRAL
 
-    # 2. Embed query and retrieve chunks
-    q_emb = embed_query(user_query)
-    chunks = retrieve_similar_chunks(q_emb, top_k=4)
+    query_embedding = embed_query(user_query)
+    chunks = retrieve_similar_chunks(query_embedding)
 
-    # 3. Build prompt dynamically
-    prompt = build_prompt(user_query, chunks, sentiment_label)
-
-    # 4. Generate answer
+    prompt = build_prompt(user_query, chunks, sentiment)
     answer = generate_answer(prompt)
 
-    return answer, sentiment_label
+    return answer, sentiment
 
 # -----------------------------
-# 5. Example interactive session
+# 8. Interactive demo
 # -----------------------------
 if __name__ == "__main__":
-    # For demonstration, train a simple sentiment classifier
-    sample_texts = ["I love this product!", "This is terrible", "Meh, it's okay"]
-    sample_labels = [2, 0, 1]
-    tfidf_pipeline = train_simple_sentiment(sample_texts, sample_labels)
+    logger.info("Bootstrapping demo sentiment model")
 
-    print("Ready for interactive chat. Type 'exit' to quit.")
+    sample_texts = [
+        "I love this product",
+        "This is terrible",
+        "It's okay, nothing special"
+    ]
+    sample_labels = [POSITIVE, NEGATIVE, NEUTRAL]
+
+    tfidf_pipeline = train_simple_sentiment(
+        sample_texts, sample_labels
+    )
+
+    logger.info("Interactive RAG chatbot ready (type 'exit')")
+
     while True:
         user_q = input("\nYou: ")
         if user_q.lower() == "exit":
             break
-        ans, sent = answer_user_query(user_q, sentiment_model_pipeline=tfidf_pipeline)
-        print(f"Bot (sentiment={sent}): {ans}")
+
+        answer, sentiment = answer_user_query(
+            user_q,
+            sentiment_model_pipeline=tfidf_pipeline
+        )
+        print(f"\nBot [sentiment={sentiment}]: {answer}")
