@@ -1,9 +1,50 @@
+import re
+from typing import List
+
 import faiss
 from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_core.documents import Document
 from langchain_openai import ChatOpenAI
 from langchain.chains import RetrievalQA
+
+
+def standardize_query(query: str) -> str:
+    """
+    Standardize the query string:
+    - Strip extra whitespace
+    - Convert to lowercase
+    - Remove unnecessary special characters
+    """
+    query = query.strip().lower()
+    query = re.sub(r"[^\w\s]", "", query)  # remove punctuation
+    return query
+
+
+def create_documents(texts: List[str]) -> List[Document]:
+    """Convert a list of strings into LangChain Document objects."""
+    return [Document(page_content=text) for text in texts]
+
+
+def build_vector_store(docs: List[Document], embedding_model) -> FAISS:
+    """Create a FAISS vector store from documents and embeddings."""
+    return FAISS.from_documents(docs, embedding_model)
+
+
+def run_qa(query: str, qa_chain: RetrievalQA, vector_store: FAISS, top_k: int = 3):
+    """
+    Perform retrieval and QA:
+    - Returns top_k retrieved documents and the generated answer
+    """
+    standardized_query = standardize_query(query)
+    retrieved_docs = vector_store.similarity_search(standardized_query, k=top_k)
+    answer = qa_chain.run(standardized_query)
+    return retrieved_docs, answer
+
+
+# -----------------------------
+# Main pipeline
+# -----------------------------
 
 # Embedding model
 embedding_model = HuggingFaceEmbeddings(
@@ -19,17 +60,13 @@ documents = [
     "LangChain makes working with LLMs easier.",
 ]
 
-# Convert to LangChain Documents
-docs = [Document(page_content=d) for d in documents]
+docs = create_documents(documents)
 
-# Create FAISS vector store
-faiss_vector_store = FAISS.from_documents(docs, embedding_model)
+# Vector store
+faiss_vector_store = build_vector_store(docs, embedding_model)
 
 # LLM
-llm = ChatOpenAI(
-    model="gpt-4o",
-    temperature=0.3
-)
+llm = ChatOpenAI(model="gpt-4o", temperature=0.3)
 
 # Retrieval QA chain
 qa_chain = RetrievalQA.from_chain_type(
@@ -38,14 +75,10 @@ qa_chain = RetrievalQA.from_chain_type(
     retriever=faiss_vector_store.as_retriever()
 )
 
-# Query
+# Example query
 query_text = "How does RAG work?"
 
-# Run retrieval
-retrieved_docs = faiss_vector_store.similarity_search(query_text)
-
-# Run QA
-result = qa_chain.run(query_text)
+retrieved_docs, answer = run_qa(query_text, qa_chain, faiss_vector_store, top_k=3)
 
 # Output
 print("Retrieved Documents:")
@@ -53,5 +86,4 @@ for doc in retrieved_docs:
     print("-", doc.page_content)
 
 print("\nGenerated Answer:")
-print(result)
-
+print(answer)
