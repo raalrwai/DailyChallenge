@@ -1,3 +1,8 @@
+#LOGIN,2026-02-10T10:00:00
+#LOGOUT,2026-02-10T10:30:00
+#ERROR,2026-02-10T11:05:00
+
+
 import sys
 from collections import defaultdict
 
