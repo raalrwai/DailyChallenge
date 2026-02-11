@@ -1,5 +1,6 @@
 from html import parser
-
+import csv
+from os import read
 
 class FileParse:
     print("FileParse class is being defined.")
@@ -11,24 +12,27 @@ class FileParse:
         seen = {}
         try:
             print(f"Parsing file: {self.filename}")
-            with open(self.filename, 'r') as file:
-                while True:
-                    file.readline()
-                    if not file.readline():
-                        break
-                    username, amount = file.readline().strip().split(",")[2:4]  
-                    self.userTotals[username] = self.userTotals.get(username, 0) + int(amount)
+            with open(self.filename) as file:
+                reader = csv.DictReader(file)
+                for row in reader:
+                        username = row["user_name"], 
+                        amount = float(row["amount"])
+                        self.userTotals[username] = self.userTotals.get(username, 0) + int(amount)
         except FileNotFoundError:   
             print(f"Error: File {self.filename} not found.")
         else:
-
+            print(f"Successfully parsed file: {self.filename}")
     def topThreeSpenders(self):
             sorted_users = sorted(self.userTotals.items(), key=lambda x: x[1], reverse=True)
-        return sorted_users[:3]
+            return sorted_users[:3]
 def main():
     print("This is the main function of main.py.")
     parser = FileParse("orders.csv")
     parser.parse()
+    top_spenders = parser.topThreeSpenders()
+    print("Top 3 spenders:")
+    for user, total in top_spenders:
+        print(f"User: {user}, Total: {total}")
 
 if __name__ == "__main__":
     main()
