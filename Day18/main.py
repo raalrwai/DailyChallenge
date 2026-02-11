@@ -1,6 +1,4 @@
-from html import parser
 import csv
-from os import read
 
 class FileParse:
     print("FileParse class is being defined.")
@@ -9,7 +7,6 @@ class FileParse:
         self.userTotals = userTotals if userTotals is not None else {}
         print(f"FileParse instance created for file: {filename}")
     def parse(self):
-        seen = {}
         try:
             print(f"Parsing file: {self.filename}")
             with open(self.filename) as file:
