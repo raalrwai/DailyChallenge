@@ -1,0 +1,11 @@
+order_id,user_id,user_name,product,amount,date
+1,101,Alice,Keyboard,50,2026-01-01
+2,102,Bob,Mouse,25,2026-01-02
+3,101,Alice,Monitor,200,2026-01-03
+4,103,Charlie,Laptop,1200,2026-01-05
+5,104,Diana,Desk,300,2026-01-06
+6,102,Bob,Headset,75,2026-01-07
+7,105,Eve,Chair,150,2026-01-08
+8,101,Alice,USB Cable,15,2026-01-09
+9,103,Charlie,Mouse Pad,10,2026-01-10
+10,106,Frank,Webcam,80,2026-01-11
