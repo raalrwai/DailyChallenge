@@ -15,7 +15,7 @@ class FileParse:
             with open(self.filename) as file:
                 reader = csv.DictReader(file)
                 for row in reader:
-                        username = row["user_name"], 
+                        username = row["user_name"]
                         amount = float(row["amount"])
                         self.userTotals[username] = self.userTotals.get(username, 0) + int(amount)
         except FileNotFoundError:   
